@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <img src="logo_clinica.gif" class="logo-clinica" alt="Clínica">
+      
+      <div class="input-group">
+        <label>Correo electrónico</label>
+        <input type="email" class="input-field" id="email">
+      </div>
+      
+      <div class="input-group password-group">
+        <label>Contraseña</label>
+        <div class="password-wrapper">
+          <input type="password" class="input-field" id="clave">
+          <i class="fas fa-eye password-toggle"></i>
+        </div>
+      </div>
+
+      <div id="error-message" class="error-message"></div>
+      
+      <div class="button-group">
+        <button class="button button-primary" id="login">Acceder</button>
+        <button class="button button-google" id="glogin">
+          <img src="google-icon.svg" class="logo-google" alt="Google">
+          Acceder con Google
+        </button>
+      </div>
+    </div>
+
+    <!-- Sección de bienvenida (oculta inicialmente) -->
+    <div id="welcome-section" class="welcome-section" style="display: none;">
+      <h1 id="welcome-message"></h1>
+      <p id="user-role"></p>
+    </div>
+  </div>
+
+  <script>
+    // Configurar Supabase
+    const supabaseUrl = 'https://zagwxayljebkofyoflbu.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ3d4YXlsamVia29meW9mbGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk3MDM5MDksImV4cCI6MjA1NTI3OTkwOX0.3Au8jo3QrPBVvBbbNqHymAHiUGHQTEK3DbcGpK8inv0';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Toggle para mostrar contraseña
+    document.querySelector('.password-toggle').addEventListener('click', function(e) {
+      const passwordInput = document.getElementById('clave');
+      this.classList.toggle('fa-eye-slash');
+      passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // Login por Google:
+document.getElementById('glogin').addEventListener('click', async () => {
+  const errorMessage = document.getElementById('error-message');
+  errorMessage.textContent = '';
+
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.href // Opcional: URL de redirección
+      }
+    });
+
+    if (error) throw error;
+
+    // Escuchar cambios en el estado de autenticación
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN') {
+        // Verificar usuario en tu tabla Tb_Usuarios
+        const { data: user } = await supabase
+          .from('Tb_Usuarios')
+          .select('*')
+          .eq('email', session.user.email)
+          .single();
+
+        if (!user) {
+          errorMessage.textContent = 'Usuario no registrado en el sistema';
+          await supabase.auth.signOut();
+          return;
+        }
+
+        if (!user.Activo) {
+          errorMessage.textContent = 'Usuario Deshabilitado';
+          await supabase.auth.signOut();
+          return;
+        }
+
+        // Obtener rol (usando el mismo código que en login normal)
+        const { data: role } = await supabase
+          .from('Tb_Roles')
+          .select('Rol')
+          .eq('id', user.Rol)
+          .single();
+
+        // Mostrar bienvenida
+        document.querySelector('.login-box').style.display = 'none';
+        document.getElementById('welcome-section').style.display = 'block';
+        document.getElementById('welcome-message').textContent = `Bienvenido, ${user.Nombre} ${user.Apellidos}`;
+        document.getElementById('user-role').textContent = `Su rol es: ${role?.Rol || 'No asignado'}`;
+      }
+    });
+
+  } catch (error) {
+    errorMessage.textContent = 'Error en autenticación con Google';
+    console.error(error);
+  }
+});
+
+    // Función de login normal
+    document.getElementById('login').addEventListener('click', async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('clave').value;
+      const errorMessage = document.getElementById('error-message');
+
+      // Validar formato de email
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errorMessage.textContent = 'El formato de correo electrónico no es válido';
+        return;
+      }
+
+      try {
+        // Buscar usuario
+        const { data: user, error } = await supabase
+          .from('Tb_Usuarios')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (error || !user) {
+          errorMessage.textContent = 'Usuario no encontrado. Contacte con su Administrador.';
+          return;
+        }
+
+        if (!user.Activo) {
+          errorMessage.textContent = 'Usuario Deshabilitado. Contacte con su Administrador.';
+          return;
+        }
+
+        if (user.Clave !== password) {
+          errorMessage.textContent = 'Contraseña incorrecta.';
+          return;
+        }
+
+        // Obtener rol del usuario
+        const { data: role } = await supabase
+          .from('Tb_Roles')
+          .select('Rol')
+          .eq('id', user.Rol)
+          .single();
+
+        // Mostrar sección de bienvenida
+        document.querySelector('.login-box').style.display = 'none';
+        document.getElementById('welcome-section').style.display = 'block';
+        document.getElementById('welcome-message').textContent = `Bienvenido, ${user.Nombre} ${user.Apellidos}`;
+        document.getElementById('user-role').textContent = `Su rol es: ${role?.Rol || 'No asignado'}`;
+
+      } catch (err) {
+        errorMessage.textContent = 'Error al conectar con el servidor';
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

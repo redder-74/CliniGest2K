@@ -10,7 +10,7 @@
   <div class="login-container">
     <div class="login-box">
       <img src="logo_clinica.gif" class="logo-clinica" alt="Clínica">
-      
+      <form id="loginForm">
       <div class="input-group">
         <label>Correo electrónico</label>
         <input type="email" class="input-field" id="email">
@@ -33,6 +33,7 @@
           Acceder con Google
         </button>
       </div>
+    </form>
     </div>
 
     <!-- Sección de bienvenida (oculta inicialmente) -->
@@ -47,6 +48,10 @@
     const supabaseUrl = 'https://zagwxayljebkofyoflbu.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ3d4YXlsamVia29meW9mbGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk3MDM5MDksImV4cCI6MjA1NTI3OTkwOX0.3Au8jo3QrPBVvBbbNqHymAHiUGHQTEK3DbcGpK8inv0';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Event listener modificado para el form
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); // Previene recarga de página
 
     // Toggle para mostrar contraseña
     document.querySelector('.password-toggle').addEventListener('click', function(e) {

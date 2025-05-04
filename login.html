@@ -141,7 +141,7 @@ document.getElementById('glogin').addEventListener('click', async () => {
 
     // Función de login normal
     document.getElementById('login').addEventListener('click', async () => {
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.toLowerCase().trim();
       const password = document.getElementById('clave').value;
       const errorMessage = document.getElementById('error-message');
 
@@ -151,13 +151,20 @@ document.getElementById('glogin').addEventListener('click', async () => {
         return;
       }
 
-      try {
+     try {
         // Buscar usuario
         const { data: user, error } = await supabase
           .from('Tb_Usuarios')
           .select('*')
           .eq('email', email)
-          .single();
+          .single()
+	// Añade estos headers:
+  	.select('*', { 
+    		headers: {
+      			Accept: 'application/json',
+      			'Accept-Profile': 'public'
+		}
+	});
 
         if (error || !user) {
           errorMessage.textContent = 'Usuario no encontrado. Contacte con su Administrador.';

@@ -11,6 +11,7 @@
     <div class="login-box">
       <img src="logo_clinica.gif" class="logo-clinica" alt="Clínica">
       <form id="loginForm">
+      
       <div class="input-group">
         <label>Correo electrónico</label>
         <input type="email" class="input-field" id="email">
@@ -19,7 +20,7 @@
       <div class="input-group password-group">
         <label>Contraseña</label>
         <div class="password-wrapper">
-          <input type="password" class="input-field" id="clave">
+          <input type="password" class="input-field" id="clave" autocomplete="current-password">
           <i class="fas fa-eye password-toggle"></i>
         </div>
       </div>
@@ -28,7 +29,7 @@
       
       <div class="button-group">
         <button class="button button-primary" id="login">Acceder</button>
-        <button class="button button-google" id="glogin">
+        <button class="button button-google" id="glogin" type="button" <!-- Evita que active el submit del formulario -->>
           <img src="google-icon.svg" class="logo-google" alt="Google">
           Acceder con Google
         </button>
@@ -44,20 +45,25 @@
   </div>
 
   <script>
+    <script>
     // Configurar Supabase
     const supabaseUrl = 'https://zagwxayljebkofyoflbu.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ3d4YXlsamVia29meW9mbGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk3MDM5MDksImV4cCI6MjA1NTI3OTkwOX0.3Au8jo3QrPBVvBbbNqHymAHiUGHQTEK3DbcGpK8inv0';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Event listener modificado para el form
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Previene recarga de página
-
-    // Toggle para mostrar contraseña
+    // Toggle para mostrar contraseña (FUERA DEL FORM SUBMIT)
     document.querySelector('.password-toggle').addEventListener('click', function(e) {
       const passwordInput = document.getElementById('clave');
       this.classList.toggle('fa-eye-slash');
       passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // Login Normal (MANEJADO POR EL FORM)
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('clave').value;
+      const errorMessage = document.getElementById('error-message');
     });
 
     // Login por Google:

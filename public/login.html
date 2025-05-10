@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Polyfill combinado para eventos pasivos
+    (function() {
+      if (typeof EventTarget !== "undefined") {
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function(type, listener, options) {
+          const passiveOptions = ['touchstart', 'touchmove', 'wheel', 'scroll'];
+          if (passiveOptions.includes(type) && (typeof options !== 'object' || options.passive === undefined)) {
+            options = { ...options, passive: true };
+          }
+          originalAddEventListener.call(this, type, listener, options);
+        };
+      }
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8"></script>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-box">
+      <img src="/logo_clinica.gif" class="logo-clinica" alt="Clínica">
+      <form id="loginForm">
+        <div class="input-group">
+          <label>Correo electrónico</label>
+          <input 
+            type="email" 
+            class="input-field" 
+            id="email"
+            autocomplete="username"
+          >
+        </div>
+        
+        <div class="input-group password-group">
+          <label>Contraseña</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              class="input-field" 
+              id="clave"
+              autocomplete="current-password"
+            >
+            <i class="fas fa-eye password-toggle"></i>
+          </div>
+        </div>
+
+        <div id="error-message" class="error-message"></div>
+        
+        <div class="button-group">
+          <button type="submit" class="button button-primary" id="login">Acceder</button>
+          <button type="button" class="button button-google" id="glogin">
+            <img src="google-icon.svg" class="logo-google" alt="Google">
+            Acceder con Google
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div id="welcome-section" class="welcome-section" style="display: none;">
+      <h1 id="welcome-message"></h1>
+      <p id="user-role"></p>
+    </div>
+  </div>
+
+  <script>
+    // Configurar Supabase
+    const supabaseUrl = 'https://zagwxayljebkofyoflbu.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ3d4YXlsamVia29meW9mbGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk3MDM5MDksImV4cCI6MjA1NTI3OTkwOX0.3Au8jo3QrPBVvBbbNqHymAHiUGHQTEK3DbcGpK8inv0';
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    // Toggle para mostrar contraseña
+    document.querySelector('.password-toggle').addEventListener('click', function(e) {
+      const passwordInput = document.getElementById('clave');
+      this.classList.toggle('fa-eye-slash');
+      passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // Login Normal
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.toLowerCase().trim();
+      const password = document.getElementById('clave').value;
+      const errorMessage = document.getElementById('error-message');
+      errorMessage.textContent = '';
+
+      try {
+        // Autenticación
+        const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+        if (authError) throw authError;
+
+        // Obtener datos del usuario
+        const { data: usuario, error: dbError } = await supabase
+          .from('Tb_Usuarios')
+          .select('*, Tb_Roles (Rol)')
+          .eq('uuid', user.id)
+          .single();
+
+        if (dbError) throw dbError;
+
+        if (!usuario.Activo) {
+          await supabase.auth.signOut();
+          throw new Error('Usuario Deshabilitado. Contacte con su Administrador.');
+        }
+
+        // Mostrar bienvenida
+        document.querySelector('.login-box').style.display = 'none';
+        document.getElementById('welcome-section').style.display = 'block';
+        document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
+        document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles?.Rol || 'No asignado'}`;
+
+      } catch (err) {
+        errorMessage.textContent = err.message || 'Error en el login';
+        console.error('Error completo:', err);
+      }
+    });
+
+    // Login Google
+    document.getElementById('glogin').addEventListener('click', async () => {
+  const errorMessage = document.getElementById('error-message');
+  errorMessage.textContent = '';
+
+  try {
+    // Paso 1: Iniciar autenticación con Google
+    const { data, error: authError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+    redirectTo: "https://clinigest2k.vercel.app/auth/callback", // Ruta explícita
+  },
+    });
+
+    if (authError) throw authError;
+
+    // Paso 2: Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN') {
+          try {
+            // Paso 3: Verificar si el usuario existe en Tb_Usuarios
+            const { data: usuario, error: userError } = await supabase
+              .from('Tb_Usuarios')
+              .select('*, Tb_Roles!Rol (Rol)')
+              .eq('email', session.user.email)
+              .single();
+
+            // Si no existe, cerrar sesión y mostrar error
+            if (userError || !usuario) {
+              await supabase.auth.signOut();
+              errorMessage.textContent = 'Usuario no registrado. Contacte al administrador.';
+              return;
+            }
+
+            // Si existe, actualizar la UI
+            document.querySelector('.login-box').style.display = 'none';
+            document.getElementById('welcome-section').style.display = 'block';
+            document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
+            document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles.Rol}`;
+
+            subscription.unsubscribe();
+          } catch (err) {
+            console.error('Error post-login:', err);
+            errorMessage.textContent = 'Error al cargar datos del usuario';
+          }
+        }
+      }
+    );
+  } catch (error) {
+    errorMessage.textContent = 'Error en autenticación Google';
+    console.error('Error Google:', error);
+  }
+});
+  </script>
+</body>
+</html>

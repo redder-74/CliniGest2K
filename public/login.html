@@ -142,35 +142,52 @@ document.getElementById('glogin').addEventListener('click', async () => {
 
     // Escuchar cambios de autenticación (solo una vez)
     authSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
-        try {
-          // Obtener datos del usuario
-          const { data: usuario, error: dbError } = await supabase
-            .from('Tb_Usuarios')
-            .select('*, Tb_Roles!Rol (Rol)')
-            .eq('uuid', session.user.id)
-            .single();
+  if (event === 'SIGNED_IN') {
+    try {
+      // 1. Obtener UUID del usuario autenticado
+      const userId = session.user.id;
+      console.log('[DEBUG] UUID del usuario:', userId);
 
-          if (dbError || !usuario) {
-            await supabase.auth.signOut();
-            errorMessage.textContent = 'Usuario no registrado.';
-            return;
-          }
+      // 2. Consultar datos del usuario
+      const { data: usuario, error: dbError } = await supabase
+        .from('Tb_Usuarios')
+        .select(`
+          Nombre,
+          Apellidos,
+          Tb_Roles!Rol (Rol)
+        `)
+        .eq('uuid', userId)
+        .single();
 
-          // Actualizar UI
-          document.querySelector('.login-box').style.display = 'none';
-          document.getElementById('welcome-section').style.display = 'block';
-          document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
-          document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles.Rol}`;
-
-          // Limpiar listener
-          authSubscription?.unsubscribe();
-        } catch (err) {
-          console.error('Error:', err);
-          errorMessage.textContent = 'Error al cargar datos del usuario';
-        }
+      if (dbError || !usuario) {
+        console.error('[DEBUG] Error en consulta:', dbError);
+        await supabase.auth.signOut();
+        errorMessage.textContent = 'Usuario no existe en nuestros registros';
+        return;
       }
-    });
+
+      // 3. Validar usuario activo
+      if (!usuario.Activo) {
+        await supabase.auth.signOut();
+        errorMessage.textContent = 'Cuenta deshabilitada';
+        return;
+      }
+
+      // 4. Actualizar UI
+      document.querySelector('.login-box').style.display = 'none';
+      document.getElementById('welcome-section').style.display = 'block';
+      document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
+      document.getElementById('user-role').textContent = `Rol: ${usuario.Tb_Roles.Rol}`;
+
+      // 5. Limpiar listener
+      authSubscription?.unsubscribe();
+
+    } catch (err) {
+      console.error('[DEBUG] Error general:', err);
+      errorMessage.textContent = 'Error al procesar el login';
+    }
+  }
+});
 
   } catch (error) {
     errorMessage.textContent = 'Error en autenticación Google';

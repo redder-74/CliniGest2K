@@ -5,75 +5,62 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
   <script>
-// Fix para event liste ners pasivos
-(function() {
-  if (typeof EventTarget !== "undefined") {
-    const func = EventTarget.prototype.addEventListener;
-    EventTarget.prototype.addEventListener = function(type, fn, capture) {
-      this.func = func;
-      if (typeof capture !== "boolean") {
-        capture = capture || {};
-        capture.passive = false;
+    // Polyfill combinado para eventos pasivos
+    (function() {
+      if (typeof EventTarget !== "undefined") {
+        const originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function(type, listener, options) {
+          const passiveOptions = ['touchstart', 'touchmove', 'wheel', 'scroll'];
+          if (passiveOptions.includes(type) && (typeof options !== 'object' || options.passive === undefined)) {
+            options = { ...options, passive: true };
+          }
+          originalAddEventListener.call(this, type, listener, options);
+        };
       }
-      this.func(type, fn, capture);
-    };
-  }
-})();
-</script>
-	<script>
-// Polyfill para forzar eventos pasivos
-(function() {
-  var supportsPassive = false;
-  try {
-    window.addEventListener("test", null, Object.defineProperty({}, 'passive', {
-      get: function() { supportsPassive = true; }
-    }));
-  } catch(e) {}
-
-  var func = EventTarget.prototype.addEventListener;
-  EventTarget.prototype.addEventListener = function(type, fn, capture) {
-    if (capture && !supportsPassive && (type === 'wheel' || type === 'touchstart' || type === 'scroll')) {
-      capture = { passive: true, capture: true };
-    }
-    func.call(this, type, fn, capture);
-  };
-})();
-</script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8"></script> <!-- Versión actualizada -->
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8"></script>
 </head>
 <body>
   <div class="login-container">
     <div class="login-box">
       <img src="logo_clinica.gif" class="logo-clinica" alt="Clínica">
       <form id="loginForm">
-      
-      <div class="input-group">
-        <label>Correo electrónico</label>
-        <input type="email" class="input-field" id="email" autocomplete="username" <!-- Atributo añadido -->
-      </div>
-      
-      <div class="input-group password-group">
-        <label>Contraseña</label>
-        <div class="password-wrapper">
-          <input type="password" class="input-field" id="clave" autocomplete="current-password">
-          <i class="fas fa-eye password-toggle"></i>
+        <div class="input-group">
+          <label>Correo electrónico</label>
+          <input 
+            type="email" 
+            class="input-field" 
+            id="email"
+            autocomplete="username"
+          >
         </div>
-      </div>
+        
+        <div class="input-group password-group">
+          <label>Contraseña</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              class="input-field" 
+              id="clave"
+              autocomplete="current-password"
+            >
+            <i class="fas fa-eye password-toggle"></i>
+          </div>
+        </div>
 
-      <div id="error-message" class="error-message"></div>
-      
-      <div class="button-group">
-        <button class="button button-primary" id="login">Acceder</button>
-        <button class="button button-google" id="glogin" type="button" <!-- Evita que active el submit del formulario -->>
-          <img src="google-icon.svg" class="logo-google" alt="Google">
-          Acceder con Google
-        </button>
-      </div>
-    </form>
+        <div id="error-message" class="error-message"></div>
+        
+        <div class="button-group">
+          <button type="submit" class="button button-primary" id="login">Acceder</button>
+          <button type="button" class="button button-google" id="glogin">
+            <img src="google-icon.svg" class="logo-google" alt="Google">
+            Acceder con Google
+          </button>
+        </div>
+      </form>
     </div>
 
-    <!-- Sección de bienvenida (oculta inicialmente) -->
     <div id="welcome-section" class="welcome-section" style="display: none;">
       <h1 id="welcome-message"></h1>
       <p id="user-role"></p>
@@ -86,155 +73,95 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZ3d4YXlsamVia29meW9mbGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk3MDM5MDksImV4cCI6MjA1NTI3OTkwOX0.3Au8jo3QrPBVvBbbNqHymAHiUGHQTEK3DbcGpK8inv0';
     const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Toggle para mostrar contraseña (FUERA DEL FORM SUBMIT)
+    // Toggle para mostrar contraseña
     document.querySelector('.password-toggle').addEventListener('click', function(e) {
       const passwordInput = document.getElementById('clave');
       this.classList.toggle('fa-eye-slash');
       passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
     });
 
-    // Login Normal (MANEJADO POR EL FORM)
+    // Login Normal
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-       // 1. Autenticación
-  	const { data: { session }, error: authError } = await supabase.auth.signInWithPassword({
-    email: document.getElementById('email').value,
-    password: document.getElementById('clave').value
- 	 });
+      const email = document.getElementById('email').value.toLowerCase().trim();
+      const password = document.getElementById('clave').value;
+      const errorMessage = document.getElementById('error-message');
+      errorMessage.textContent = '';
 
-  if (authError) {
-    console.error('Error auth:', authError);
-    return;
-  }
+      try {
+        // Autenticación
+        const { data: { user }, error: authError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
 
-  // 2. Consulta con JWT
-  const { data: usuario, error: dbError } = await supabase
-    .from('Tb_Usuarios')
-    .select('*')
-    .eq('email', session.user.email)
-    .single()
-    .select('*', {
-      headers: {
-        Authorization: `Bearer ${session.access_token}` // Añade el JWT manualmente
-      }
-    });
+        if (authError) throw authError;
 
-    // Login por Google:
-document.getElementById('glogin').addEventListener('click', async () => {
-  const errorMessage = document.getElementById('error-message');
-  errorMessage.textContent = '';
-
-  try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.href // Opcional: URL de redirección
-      }
-    });
-
-    if (error) throw error;
-
-    // Escuchar cambios en el estado de autenticación
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN') {
-        // Verificar usuario en tu tabla Tb_Usuarios
-        const { data: user } = await supabase
+        // Obtener datos del usuario
+        const { data: usuario, error: dbError } = await supabase
           .from('Tb_Usuarios')
-          .select('*')
-          .eq('email', session.user.email)
+          .select('*, Tb_Roles (Rol)')
+          .eq('uuid', user.id)
           .single();
 
-        if (!user) {
-          errorMessage.textContent = 'Usuario no registrado en el sistema';
-          await supabase.auth.signOut();
-          return;
-        }
+        if (dbError) throw dbError;
 
-        if (!user.Activo) {
-          errorMessage.textContent = 'Usuario Deshabilitado';
+        if (!usuario.Activo) {
           await supabase.auth.signOut();
-          return;
+          throw new Error('Usuario Deshabilitado. Contacte con su Administrador.');
         }
-
-        // Obtener rol (usando el mismo código que en login normal)
-        const { data: role } = await supabase
-          .from('Tb_Roles')
-          .select('Rol')
-          .eq('id', user.Rol)
-          .single();
 
         // Mostrar bienvenida
         document.querySelector('.login-box').style.display = 'none';
         document.getElementById('welcome-section').style.display = 'block';
-        document.getElementById('welcome-message').textContent = `Bienvenido, ${user.Nombre} ${user.Apellidos}`;
-        document.getElementById('user-role').textContent = `Su rol es: ${role?.Rol || 'No asignado'}`;
+        document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
+        document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles?.Rol || 'No asignado'}`;
+
+      } catch (err) {
+        errorMessage.textContent = err.message || 'Error en el login';
+        console.error('Error completo:', err);
       }
     });
 
-  } catch (error) {
-    errorMessage.textContent = 'Error en autenticación con Google';
-    console.error(error);
-  }
-});
-
-    // Función de login normal
-    document.getElementById('login').addEventListener('click', async () => {
-      const email = document.getElementById('email').value.toLowerCase().trim();
-      const password = document.getElementById('clave').value;
+    // Login Google
+    document.getElementById('glogin').addEventListener('click', async () => {
       const errorMessage = document.getElementById('error-message');
+      errorMessage.textContent = '';
 
-      // Validar formato de email
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        errorMessage.textContent = 'El formato de correo electrónico no es válido';
-        return;
-      }
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.href }
+        });
 
-     try {
-        // Buscar usuario
-        const { data: user, error } = await supabase
-          .from('Tb_Usuarios')
-          .select('*')
-          .eq('email', email)
-          .single()
-	// Añade estos headers:
-  	.select('*', { 
-    		headers: {
-      			Accept: 'application/json',
-      			'Accept-Profile': 'public'
-		}
-	});
+        if (error) throw error;
 
-        if (error || !user) {
-          errorMessage.textContent = 'Usuario no encontrado. Contacte con su Administrador.';
-          return;
-        }
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_IN') {
+            const { data: usuario, error: dbError } = await supabase
+              .from('Tb_Usuarios')
+              .select('*, Tb_Roles (Rol)')
+              .eq('uuid', session.user.id)
+              .single();
 
-        if (!user.Activo) {
-          errorMessage.textContent = 'Usuario Deshabilitado. Contacte con su Administrador.';
-          return;
-        }
+            if (dbError) throw dbError;
 
-        if (user.Clave !== password) {
-          errorMessage.textContent = 'Contraseña incorrecta.';
-          return;
-        }
+            if (!usuario.Activo) {
+              errorMessage.textContent = 'Usuario Deshabilitado';
+              await supabase.auth.signOut();
+              return;
+            }
 
-        // Obtener rol del usuario
-        const { data: role } = await supabase
-          .from('Tb_Roles')
-          .select('Rol')
-          .eq('id', user.Rol)
-          .single();
+            document.querySelector('.login-box').style.display = 'none';
+            document.getElementById('welcome-section').style.display = 'block';
+            document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
+            document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles?.Rol || 'No asignado'}`;
+          }
+        });
 
-        // Mostrar sección de bienvenida
-        document.querySelector('.login-box').style.display = 'none';
-        document.getElementById('welcome-section').style.display = 'block';
-        document.getElementById('welcome-message').textContent = `Bienvenido, ${user.Nombre} ${user.Apellidos}`;
-        document.getElementById('user-role').textContent = `Su rol es: ${role?.Rol || 'No asignado'}`;
-
-      } catch (err) {
-        errorMessage.textContent = 'Error al conectar con el servidor';
-        console.error(err);
+      } catch (error) {
+        errorMessage.textContent = 'Error en autenticación Google';
+        console.error(error);
       }
     });
   </script>

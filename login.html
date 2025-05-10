@@ -125,29 +125,32 @@
 
     // Login Google
     document.getElementById('glogin').addEventListener('click', async () => {
-      const errorMessage = document.getElementById('error-message');
-      errorMessage.textContent = '';
+  const errorMessage = document.getElementById('error-message');
+  errorMessage.textContent = '';
 
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.href }
-        });
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin // Usar origen actual
+      }
+    });
 
-        if (error) throw error;
+    if (error) throw error;
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_IN') {
-            const { data: usuario, error: dbError } = await supabase
+    // Escuchar cambios de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN') {
+          try {
+            const { data: usuario } = await supabase
               .from('Tb_Usuarios')
-              .select('*, Tb_Roles (Rol)')
+              .select('*, Tb_Roles!Rol (Rol)')
               .eq('uuid', session.user.id)
               .single();
 
-            if (dbError) throw dbError;
-
-            if (!usuario.Activo) {
-              errorMessage.textContent = 'Usuario Deshabilitado';
+            if (!usuario) {
+              errorMessage.textContent = 'Usuario no registrado';
               await supabase.auth.signOut();
               return;
             }
@@ -155,15 +158,22 @@
             document.querySelector('.login-box').style.display = 'none';
             document.getElementById('welcome-section').style.display = 'block';
             document.getElementById('welcome-message').textContent = `Bienvenido, ${usuario.Nombre} ${usuario.Apellidos}`;
-            document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles?.Rol || 'No asignado'}`;
-          }
-        });
+            document.getElementById('user-role').textContent = `Su rol es: ${usuario.Tb_Roles.Rol}`;
 
-      } catch (error) {
-        errorMessage.textContent = 'Error en autenticación Google';
-        console.error(error);
+            subscription.unsubscribe(); // Limpiar listener
+          } catch (err) {
+            console.error('Error post-login:', err);
+            errorMessage.textContent = 'Error al cargar datos del usuario';
+          }
+        }
       }
-    });
+    );
+
+  } catch (error) {
+    errorMessage.textContent = 'Error en autenticación Google';
+    console.error('Error Google:', error);
+  }
+});
   </script>
 </body>
 </html>

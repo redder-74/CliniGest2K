@@ -96,9 +96,27 @@
     // Login Normal (MANEJADO POR EL FORM)
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('clave').value;
-      const errorMessage = document.getElementById('error-message');
+       // 1. Autenticación
+  	const { data: { session }, error: authError } = await supabase.auth.signInWithPassword({
+    email: document.getElementById('email').value,
+    password: document.getElementById('clave').value
+ 	 });
+
+  if (authError) {
+    console.error('Error auth:', authError);
+    return;
+  }
+
+  // 2. Consulta con JWT
+  const { data: usuario, error: dbError } = await supabase
+    .from('Tb_Usuarios')
+    .select('*')
+    .eq('email', session.user.email)
+    .single()
+    .select('*', {
+      headers: {
+        Authorization: `Bearer ${session.access_token}` // Añade el JWT manualmente
+      }
     });
 
     // Login por Google:

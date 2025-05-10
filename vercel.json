@@ -1,9 +1,7 @@
 {
-  "redirects": [
-    {
-      "source": "/auth/callback",
-      "destination": "/",
-      "permanent": false
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/auth/callback", "dest": "/login.html" }, // Redirige a tu página de login
+    { "src": ".*", "dest": "/login.html" } // Sirve login.html para todas las rutas
   ]
 }

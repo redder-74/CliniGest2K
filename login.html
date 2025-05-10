@@ -20,6 +20,26 @@
   }
 })();
 </script>
+	<script>
+// Polyfill para forzar eventos pasivos
+(function() {
+  var supportsPassive = false;
+  try {
+    window.addEventListener("test", null, Object.defineProperty({}, 'passive', {
+      get: function() { supportsPassive = true; }
+    }));
+  } catch(e) {}
+
+  var func = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function(type, fn, capture) {
+    if (capture && !supportsPassive && (type === 'wheel' || type === 'touchstart' || type === 'scroll')) {
+      capture = { passive: true, capture: true };
+    }
+    func.call(this, type, fn, capture);
+  };
+})();
+</script>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.8"></script> <!-- Versión actualizada -->
 </head>
 <body>
